@@ -1,0 +1,52 @@
+spring:
+  application:
+    name: callisto-doc-enterprise
+  datasource:
+    url: ${DB_URL:jdbc:h2:mem:callistodev;DB_CLOSE_DELAY=-1}
+    username: ${DB_USER:sa}
+    password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 15
+      minimum-idle: 3
+      connection-timeout: 10000
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: false
+    open-in-view: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  threads:
+    virtual:
+      enabled: true
+
+azure:
+  doc-intel:
+    endpoints:
+      - url: ${AZURE_DI_ENDPOINT:https://placeholder.cognitiveservices.azure.com/}
+        key: ${AZURE_DI_KEY:placeholder}
+
+callisto:
+  batch:
+    max-concurrency: 8
+    chunk-size: 10
+  extraction:
+    confidence-threshold: 0.50
+    high-threshold: 500
+    medium-threshold: 100
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    io.callistotech: INFO
+    org.springframework.security: WARN
