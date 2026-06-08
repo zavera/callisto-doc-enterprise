@@ -96,7 +96,9 @@ public class ExtractionController {
                 payload.documentId(),
                 JobStatus.COMPLETE,
                 fields,
-                null,
+                null,   // reconciliation — single doc, no cross-doc report
+                "",     // documentSummary — TODO wire SummaryService.summariseDocument()
+                "",     // fileSummary — single doc, not applicable
                 processingMs
         ));
     }
@@ -122,7 +124,9 @@ public class ExtractionController {
                             r.getDocumentId(),
                             JobStatus.COMPLETE,
                             fields,
-                            null,
+                            null,   // reconciliation not stored per-result
+                            "",     // documentSummary not stored per-result
+                            "",     // fileSummary not applicable
                             0L
                     );
                 })

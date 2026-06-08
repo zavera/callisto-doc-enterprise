@@ -22,7 +22,23 @@
         <azure.document.intelligence.version>4.1.8</azure.document.intelligence.version>
         <pdfbox.version>3.0.3</pdfbox.version>
         <aws.sdk.version>2.25.70</aws.sdk.version>
+        <spring-ai.version>1.0.0-M6</spring-ai.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- Explicit Spring AI version fallback in case BOM resolution lags -->
+    <!-- Remove once confirmed BOM resolves correctly -->
 
     <dependencies>
         <!-- Spring Boot -->
@@ -80,6 +96,13 @@
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>s3</artifactId>
             <version>${aws.sdk.version}</version>
+        </dependency>
+
+        <!-- Spring AI — Groq (OpenAI-compatible endpoint) -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-openai-spring-boot-starter</artifactId>
+            <version>${spring-ai.version}</version>
         </dependency>
 
         <!-- Lombok -->

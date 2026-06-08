@@ -119,7 +119,9 @@ public class BatchController {
                             r.getDocumentId(),
                             JobStatus.COMPLETE,
                             fields,
-                            null,
+                            null,   // reconciliation — populated separately via file summary endpoint
+                            "",     // documentSummary — TODO wire SummaryService per doc
+                            "",     // fileSummary — TODO wire SummaryService.summariseFile() on batch complete
                             0L
                     );
                 })

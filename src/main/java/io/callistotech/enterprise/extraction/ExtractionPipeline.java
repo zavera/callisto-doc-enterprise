@@ -3,6 +3,7 @@ package io.callistotech.enterprise.extraction;
 import io.callistotech.enterprise.domain.ExtractedField;
 import io.callistotech.enterprise.domain.Severity;
 import io.callistotech.enterprise.fieldmap.FieldMap;
+import io.callistotech.enterprise.summary.SummaryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -26,6 +27,7 @@ public class ExtractionPipeline {
 
     private final AzureDocIntelExtractor extractor;
     private final DeltaCalculator deltaCalculator;
+    private final SummaryService summaryService;
 
     /**
      * Runs the full extraction pipeline for a single document.
@@ -79,4 +81,35 @@ public class ExtractionPipeline {
 
         return fields;
     }
+
+    /**
+     * Runs the full extraction pipeline and appends a plain-English Groq summary.
+     *
+     * Use this for real-time single-document extractions where the caller wants
+     * an immediately reviewable result. For batch jobs, call {@link #run} per
+     * document and generate the file-level summary once via
+     * {@link SummaryService#summariseFile} after reconciliation completes.
+     *
+     * @return {@link ExtractionResult} containing fields + per-document summary
+     */
+    public ExtractionResult runWithSummary(
+            byte[] pdfBytes,
+            FieldMap fieldMap,
+            Map<String, BigDecimal> referenceValues,
+            String sourceDocType,
+            String jobId,
+            String docId) {
+
+        List<ExtractedField> fields = run(pdfBytes, fieldMap, referenceValues, sourceDocType, jobId, docId);
+        String summary = summaryService.summariseDocument(fields, sourceDocType, jobId);
+        return new ExtractionResult(fields, summary);
+    }
+
+    /**
+     * Holds the output of a pipeline run that includes summary generation.
+     */
+    public record ExtractionResult(
+            List<ExtractedField> fields,
+            String documentSummary
+    ) {}
 }

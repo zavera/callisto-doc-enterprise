@@ -28,6 +28,18 @@ azure:
       - url: ${AZURE_DI_ENDPOINT:https://placeholder.cognitiveservices.azure.com/}
         key: ${AZURE_DI_KEY:placeholder}
 
+# Spring AI — Groq (OpenAI-compatible, fast inference for structured summaries)
+spring:
+  ai:
+    openai:
+      api-key: ${GROQ_API_KEY:placeholder}
+      base-url: https://api.groq.com/openai
+      chat:
+        options:
+          model: ${GROQ_MODEL:llama-3.3-70b-versatile}
+          temperature: 0.2   # low temperature — summaries should be factual, not creative
+          max-tokens: 512    # summaries are short; cap spend
+
 callisto:
   batch:
     max-concurrency: 8
@@ -36,6 +48,8 @@ callisto:
     confidence-threshold: 0.50
     high-threshold: 500
     medium-threshold: 100
+  summary:
+    enabled: ${SUMMARY_ENABLED:true}   # set false to skip LLM call (e.g. in tests or if no GROQ_API_KEY)
 
 management:
   endpoints:
