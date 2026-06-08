@@ -25,9 +25,14 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Public: demo UI + demo extraction endpoint
+                        .requestMatchers("/", "/index.html", "/style.css").permitAll()
+                        .requestMatchers("/demo/**").permitAll()
+                        // Public: health, monitoring, local dev
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
+                        // All other API endpoints require X-API-Key
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(apiKeyAuthFilter, UsernamePasswordAuthenticationFilter.class)

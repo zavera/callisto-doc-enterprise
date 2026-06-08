@@ -41,6 +41,8 @@ spring:
           max-tokens: 512    # summaries are short; cap spend
 
 callisto:
+  demo:
+    real-extraction: ${DEMO_REAL_EXTRACTION:false}  # true = use real Azure DI; false = canned demo data
   batch:
     max-concurrency: 8
     chunk-size: 10
