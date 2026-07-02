@@ -1,0 +1,17 @@
+Classify each tax document by its IRS form type.
+
+Use the document name and the full extracted text content shown below.
+A single document's content may contain more than one distinct IRS form — for
+example a bundled upload with a Schedule C immediately followed by a Schedule SE
+on the same file. Identify EVERY distinct IRS form type present in the content,
+in the order they appear. Most documents contain exactly one form.
+Apply your knowledge of IRS tax forms — there is no restricted label list.
+Return the standard IRS form name exactly as it appears on the form (e.g. "Form 1040", "Schedule C", "W-2", "Schedule 2", "Schedule 3", "Form 1099-R").
+
+{{DOCUMENTS}}
+
+Return a JSON object only — no explanation, no markdown fences.
+Keys are the Document IDs shown above. Each value is an ARRAY
+of IRS form type names present in that document — use a single-element array
+when only one form is present.
+Example: {"123": ["Form 1040"], "456": ["Schedule C", "Schedule SE"], "789": ["W-2"]}

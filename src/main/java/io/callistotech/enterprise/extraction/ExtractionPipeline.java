@@ -48,11 +48,23 @@ public class ExtractionPipeline {
             String jobId,
             String docId) {
 
+        return runInternal(pdfBytes, fieldMap, referenceValues, sourceDocType, jobId, docId).fields();
+    }
+
+    private Extraction runInternal(
+            byte[] pdfBytes,
+            FieldMap fieldMap,
+            Map<String, BigDecimal> referenceValues,
+            String sourceDocType,
+            String jobId,
+            String docId) {
+
         log.info("Pipeline start: job=[{}] doc=[{}] fieldMap=[{}]", jobId, docId, fieldMap.name());
 
         KvNormalizer normalizer = new KvNormalizer(fieldMap);
 
-        List<AzureDocIntelExtractor.KvEntry> rawEntries = extractor.extract(pdfBytes, jobId, docId);
+        AzureDocIntelExtractor.AnalysisOutcome outcome = extractor.extract(pdfBytes, jobId, docId);
+        List<AzureDocIntelExtractor.KvEntry> rawEntries = outcome.entries();
         log.info("Extraction complete: job=[{}] doc=[{}] rawEntries={}", jobId, docId, rawEntries.size());
 
         List<ExtractedField> fields = rawEntries.stream()
@@ -79,7 +91,7 @@ public class ExtractionPipeline {
         log.info("Pipeline complete: job=[{}] doc=[{}] fields={} high={} medium={}",
                 jobId, docId, fields.size(), highCount, mediumCount);
 
-        return fields;
+        return new Extraction(fields, outcome.content());
     }
 
     /**
@@ -100,16 +112,24 @@ public class ExtractionPipeline {
             String jobId,
             String docId) {
 
-        List<ExtractedField> fields = run(pdfBytes, fieldMap, referenceValues, sourceDocType, jobId, docId);
-        String summary = summaryService.summariseDocument(fields, sourceDocType, jobId);
-        return new ExtractionResult(fields, summary);
+        Extraction extraction = runInternal(pdfBytes, fieldMap, referenceValues, sourceDocType, jobId, docId);
+        String summary = summaryService.summariseDocument(extraction.fields(), sourceDocType, jobId);
+        return new ExtractionResult(extraction.fields(), summary, extraction.rawText());
     }
 
     /**
      * Holds the output of a pipeline run that includes summary generation.
+     *
+     * @param rawText full raw OCR text for the document (Azure DI {@code getContent()}),
+     *                kept separate from {@code fields} since it's the input a document
+     *                classifier would read instead of KV pairs
      */
     public record ExtractionResult(
             List<ExtractedField> fields,
-            String documentSummary
+            String documentSummary,
+            String rawText
     ) {}
+
+    /** Internal pairing of extracted fields with the raw OCR text from the same Azure DI call. */
+    private record Extraction(List<ExtractedField> fields, String rawText) {}
 }

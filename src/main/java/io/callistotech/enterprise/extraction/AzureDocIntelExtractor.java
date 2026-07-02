@@ -54,15 +54,15 @@ public class AzureDocIntelExtractor {
     }
 
     /**
-     * Extracts key-value pairs from a PDF document byte array.
+     * Extracts key-value pairs and full raw OCR text from a PDF document byte array.
      * Attempts stage 0 first; falls back through the recovery chain on failure.
      *
      * @param pdfBytes raw PDF bytes
      * @param jobId    job identifier for logging (no PII)
      * @param docId    document identifier for logging (no PII)
-     * @return list of extracted KV entries
+     * @return outcome carrying both the extracted KV entries and the raw text
      */
-    public List<KvEntry> extract(byte[] pdfBytes, String jobId, String docId) {
+    public AnalysisOutcome extract(byte[] pdfBytes, String jobId, String docId) {
         log.info("Starting extraction stage 0 for job=[{}] doc=[{}]", jobId, docId);
 
         try {
@@ -84,13 +84,13 @@ public class AzureDocIntelExtractor {
         // Stage 3: TODO(phase-3): rotation correction — detect and correct page rotation, resubmit
 
         log.error("All extraction stages failed for job=[{}] doc=[{}]", jobId, docId);
-        return List.of();
+        return AnalysisOutcome.EMPTY;
     }
 
     /**
      * Submits a single PDF byte array to Azure DI with exponential backoff on 429.
      */
-    private List<KvEntry> extractWithRetry(byte[] pdfBytes, String jobId, String docId) {
+    private AnalysisOutcome extractWithRetry(byte[] pdfBytes, String jobId, String docId) {
         for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
             try {
                 return callAzureDi(pdfBytes);
@@ -110,10 +110,11 @@ public class AzureDocIntelExtractor {
 
     /**
      * Splits PDF into single-page documents using PDFBox and extracts each page separately.
-     * Merges results from all pages.
+     * Merges KV entries and joins raw text from all pages (page order, "\n\n"-separated).
      */
-    private List<KvEntry> extractPageChunks(byte[] pdfBytes, String jobId, String docId) throws IOException {
+    private AnalysisOutcome extractPageChunks(byte[] pdfBytes, String jobId, String docId) throws IOException {
         List<KvEntry> allEntries = new ArrayList<>();
+        List<String> allContent = new ArrayList<>();
 
         try (PDDocument document = Loader.loadPDF(pdfBytes)) {
             int pageCount = document.getNumberOfPages();
@@ -122,15 +123,18 @@ public class AzureDocIntelExtractor {
             for (int i = 0; i < pageCount; i++) {
                 byte[] pageBytes = extractSinglePage(document, i);
                 try {
-                    List<KvEntry> pageEntries = extractWithRetry(pageBytes, jobId, docId + "_p" + i);
-                    allEntries.addAll(pageEntries);
+                    AnalysisOutcome pageOutcome = extractWithRetry(pageBytes, jobId, docId + "_p" + i);
+                    allEntries.addAll(pageOutcome.entries());
+                    if (!pageOutcome.content().isBlank()) {
+                        allContent.add(pageOutcome.content());
+                    }
                 } catch (Exception e) {
                     log.warn("Page {} extraction failed for job=[{}] doc=[{}]: {}", i, jobId, docId, e.getMessage());
                 }
             }
         }
 
-        return allEntries;
+        return new AnalysisOutcome(allEntries, String.join("\n\n", allContent));
     }
 
     /**
@@ -149,13 +153,14 @@ public class AzureDocIntelExtractor {
     /**
      * Picks the next client from the pool (round-robin) and calls Azure DI.
      */
-    private List<KvEntry> callAzureDi(byte[] pdfBytes) {
+    private AnalysisOutcome callAzureDi(byte[] pdfBytes) {
         DocumentAnalysisClient client = nextClient();
         AnalyzeResult result = client
                 .beginAnalyzeDocument(MODEL_ID, BinaryData.fromBytes(pdfBytes))
                 .getFinalResult();
 
-        return buildKvEntries(result);
+        String content = result.getContent();
+        return new AnalysisOutcome(buildKvEntries(result), content != null ? content : "");
     }
 
     private List<KvEntry> buildKvEntries(AnalyzeResult result) {
@@ -209,4 +214,17 @@ public class AzureDocIntelExtractor {
      * @param confidence Azure DI confidence score (0.0 – 1.0)
      */
     public record KvEntry(String key, String value, BigDecimal confidence) {}
+
+    /**
+     * Carries both the key-value pairs and the full raw OCR text
+     * ({@code AnalyzeResult.getContent()}) from a single Azure DI call.
+     *
+     * <p>The raw text is kept separate from the KV entries since it's the input a
+     * document classifier would read instead of KV pairs (e.g. a form's title
+     * carries no adjacent value and is therefore invisible to KV-pair extraction
+     * alone).
+     */
+    public record AnalysisOutcome(List<KvEntry> entries, String content) {
+        public static final AnalysisOutcome EMPTY = new AnalysisOutcome(List.of(), "");
+    }
 }
