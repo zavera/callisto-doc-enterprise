@@ -91,6 +91,15 @@
             <version>${pdfbox.version}</version>
         </dependency>
 
+        <!-- imgscalr — single-class proportional image scaler used by PdfNormalizer
+             to iteratively shrink re-rendered pages until the output PDF fits under
+             Azure Document Intelligence's 4 MB InvalidContentLength threshold. -->
+        <dependency>
+            <groupId>org.imgscalr</groupId>
+            <artifactId>imgscalr-lib</artifactId>
+            <version>4.2</version>
+        </dependency>
+
         <!-- AWS SDK v2 for S3 connector -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
@@ -155,6 +164,9 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
+                    <!-- Produces callisto-doc-enterprise-VERSION-exec.jar as the runnable fat JAR,
+                         leaving the main artifact as a regular JAR importable by other projects. -->
+                    <classifier>exec</classifier>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>
@@ -162,6 +174,18 @@
                         </exclude>
                     </excludes>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

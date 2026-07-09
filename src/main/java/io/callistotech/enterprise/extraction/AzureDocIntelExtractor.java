@@ -26,7 +26,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Recovery chain (4 stages):
  *   Stage 0 — full document submitted as-is
  *   Stage 1 — split into single-page chunks via PDFBox; each page submitted separately
- *   Stage 2 — TODO(phase-2): DPI reduction before resubmission
+ *   Stage 2 — DPI reduction via {@link PdfNormalizer}: re-render and iteratively
+ *             shrink until the PDF fits under Azure DI's 4 MB InvalidContentLength
+ *             limit, then resubmit as a whole document (not re-chunked)
  *   Stage 3 — TODO(phase-3): rotation correction before resubmission
  *
  * Endpoint pool: round-robin via AtomicInteger counter % pool size for throughput.
@@ -39,6 +41,9 @@ public class AzureDocIntelExtractor {
     private static final String MODEL_ID = "prebuilt-document";
     private static final int MAX_RETRIES = 4;
     private static final long BASE_BACKOFF_MS = 1_000L;
+
+    /** Baseline render DPI for Stage 2 before any shrinking. */
+    private static final int NORMALIZE_BASELINE_DPI = 300;
 
     private final List<DocumentAnalysisClient> clientPool;
     private final AtomicInteger roundRobinCounter = new AtomicInteger(0);
@@ -80,7 +85,14 @@ public class AzureDocIntelExtractor {
                     jobId, docId, e.getMessage());
         }
 
-        // Stage 2: TODO(phase-2): DPI reduction — reduce PDF resolution and resubmit
+        // Stage 2: DPI reduction via PdfNormalizer, resubmitted as a whole document
+        try {
+            return extractNormalized(pdfBytes, jobId, docId);
+        } catch (Exception e) {
+            log.warn("Stage 2 DPI-reduced extraction failed for job=[{}] doc=[{}]: {}",
+                    jobId, docId, e.getMessage());
+        }
+
         // Stage 3: TODO(phase-3): rotation correction — detect and correct page rotation, resubmit
 
         log.error("All extraction stages failed for job=[{}] doc=[{}]", jobId, docId);
@@ -148,6 +160,17 @@ public class AzureDocIntelExtractor {
             singlePage.save(bos);
             return bos.toByteArray();
         }
+    }
+
+    /**
+     * Re-renders and iteratively shrinks the PDF via {@link PdfNormalizer} until it
+     * fits under Azure DI's 4 MB InvalidContentLength limit, then submits the
+     * normalized whole document (not re-chunked from Stage 1).
+     */
+    private AnalysisOutcome extractNormalized(byte[] pdfBytes, String jobId, String docId) throws IOException {
+        log.info("Stage 2: normalizing DPI for job=[{}] doc=[{}]", jobId, docId);
+        byte[] normalized = PdfNormalizer.normalize(pdfBytes, NORMALIZE_BASELINE_DPI);
+        return extractWithRetry(normalized, jobId, docId);
     }
 
     /**
