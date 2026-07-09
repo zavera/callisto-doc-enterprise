@@ -249,5 +249,8 @@ public class AzureDocIntelExtractor {
      */
     public record AnalysisOutcome(List<KvEntry> entries, String content) {
         public static final AnalysisOutcome EMPTY = new AnalysisOutcome(List.of(), "");
+
+        /** JavaBean-style alias for {@link #content()}. */
+        public String getContent() { return content; }
     }
 }
