@@ -5,3 +5,6 @@ target/
 *.iml
 .env
 application-local.yml
+
+# Local extraction test output -- may contain real extracted PII, never commit
+ocr-test-output/
